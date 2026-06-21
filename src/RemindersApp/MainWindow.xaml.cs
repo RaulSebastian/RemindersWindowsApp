@@ -11,15 +11,6 @@ public partial class MainWindow : Window
 {
     private const string RemindersUrl = "https://www.icloud.com/reminders/";
 
-    private static readonly string[] AllowedHosts =
-    [
-        "icloud.com",
-        "apple.com",
-        "idmsa.apple.com",
-        "appleid.apple.com",
-        "gsa.apple.com",
-        "icloud.com.cn",
-    ];
 
     public MainWindow()
     {
@@ -71,13 +62,13 @@ public partial class MainWindow : Window
     private void Core_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
         e.Handled = true;
-        if (IsAllowedUrl(e.Uri))
+        if (NavigationGuard.IsAllowedUrl(e.Uri))
             WebView.CoreWebView2.Navigate(e.Uri);
     }
 
     private void WebView_NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
     {
-        if (!IsAllowedUrl(e.Uri))
+        if (!NavigationGuard.IsAllowedUrl(e.Uri))
         {
             e.Cancel = true;
             return;
@@ -100,18 +91,6 @@ public partial class MainWindow : Window
         });
     }
 
-    private static bool IsAllowedUrl(string url)
-    {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            return false;
-
-        // Allow non-http schemes used internally (e.g. about:blank, data:)
-        if (uri.Scheme != "https" && uri.Scheme != "http")
-            return true;
-
-        var host = uri.Host.ToLowerInvariant();
-        return AllowedHosts.Any(allowed => host == allowed || host.EndsWith("." + allowed));
-    }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
