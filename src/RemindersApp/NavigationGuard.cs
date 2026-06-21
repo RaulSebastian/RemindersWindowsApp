@@ -2,10 +2,9 @@ namespace RemindersApp;
 
 internal static class NavigationGuard
 {
-    internal static readonly string[] AllowedHosts =
+    // These hosts handle sign-in and are allowed regardless of path
+    internal static readonly string[] AuthHosts =
     [
-        "icloud.com",
-        "apple.com",
         "idmsa.apple.com",
         "appleid.apple.com",
         "gsa.apple.com",
@@ -22,6 +21,14 @@ internal static class NavigationGuard
             return true;
 
         var host = uri.Host.ToLowerInvariant();
-        return AllowedHosts.Any(allowed => host == allowed || host.EndsWith("." + allowed));
+
+        if (AuthHosts.Any(a => host == a || host.EndsWith("." + a)))
+            return true;
+
+        // Only allow the reminders section of iCloud, not the homepage or other apps
+        if (host == "icloud.com" || host.EndsWith(".icloud.com"))
+            return uri.AbsolutePath.StartsWith("/reminders", StringComparison.OrdinalIgnoreCase);
+
+        return false;
     }
 }

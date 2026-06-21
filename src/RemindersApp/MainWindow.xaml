@@ -71,6 +71,8 @@
                      Foreground="#1C1C1C" VerticalAlignment="Center"/>
           <TextBlock x:Name="LoadingIndicator" Text="  Loading…" FontSize="12"
                      Foreground="#888888" VerticalAlignment="Center" Visibility="Collapsed"/>
+          <TextBlock x:Name="DebugUrlIndicator" FontSize="11" Foreground="#0066CC"
+                     VerticalAlignment="Center" Margin="10,0,0,0" Visibility="Collapsed"/>
         </StackPanel>
 
         <StackPanel Grid.Column="1" Orientation="Horizontal">

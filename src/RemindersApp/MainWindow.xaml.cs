@@ -57,7 +57,45 @@ public partial class MainWindow : Window
         core.NewWindowRequested += Core_NewWindowRequested;
         core.DocumentTitleChanged += (_, _) =>
             Dispatcher.Invoke(() => Title = core.DocumentTitle is { Length: > 0 } t ? t : "Reminders");
+
+        core.AddScriptToExecuteOnDocumentCreatedAsync(HideOffAppLinksScript);
     }
+
+    // Hides links and buttons that navigate away from the reminders section.
+    // "Learn more", the iCloud logo, and the app-switcher (···) all point to allowed hosts
+    // but take the user out of the reminders app — so we keep only reminders paths + auth hosts.
+    private const string HideOffAppLinksScript = """
+        (function () {
+            const authHosts = ['idmsa.apple.com', 'appleid.apple.com', 'gsa.apple.com', 'icloud.com.cn'];
+
+            function shouldHide(el) {
+                const href = el.getAttribute('href');
+                if (!href) return false;
+                try {
+                    const url = new URL(href, location.href);
+                    const h = url.hostname.toLowerCase();
+                    if (authHosts.some(a => h === a || h.endsWith('.' + a))) return false;
+                    if ((h === 'icloud.com' || h.endsWith('.icloud.com'))
+                            && url.pathname.startsWith('/reminders')) return false;
+                    return true;
+                } catch { return false; }
+            }
+
+            function hideOffAppLinks(root) {
+                (root.querySelectorAll ? root : document).querySelectorAll('a[href]').forEach(a => {
+                    if (shouldHide(a)) a.style.setProperty('display', 'none', 'important');
+                });
+            }
+
+            hideOffAppLinks(document);
+
+            new MutationObserver(mutations => {
+                for (const m of mutations)
+                    for (const node of m.addedNodes)
+                        if (node.nodeType === 1) hideOffAppLinks(node);
+            }).observe(document.documentElement, { childList: true, subtree: true });
+        })();
+        """;
 
     private void Core_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
@@ -79,16 +117,27 @@ public partial class MainWindow : Window
             LoadingIndicator.Visibility = Visibility.Visible;
             StatusBar.Visibility = Visibility.Visible;
             StatusText.Text = $"Loading {new Uri(e.Uri).Host}…";
+#if DEBUG
+            DebugUrlIndicator.Visibility = Visibility.Visible;
+            DebugUrlIndicator.Text = e.Uri;
+#endif
         });
     }
 
-    private void WebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+    private async void WebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
     {
         Dispatcher.Invoke(() =>
         {
             LoadingIndicator.Visibility = Visibility.Collapsed;
             StatusBar.Visibility = Visibility.Collapsed;
+#if DEBUG
+            DebugUrlIndicator.Text = WebView.Source?.ToString() ?? string.Empty;
+#endif
         });
+
+        // Re-run after the SPA has rendered — AddScriptToExecuteOnDocumentCreatedAsync fires too
+        // early for iCloud's React app; MutationObserver handles subsequent dynamic updates.
+        await WebView.CoreWebView2.ExecuteScriptAsync(HideOffAppLinksScript);
     }
 
 
