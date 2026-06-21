@@ -1,0 +1,127 @@
+<Window x:Class="RemindersApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Reminders"
+        Height="800" Width="1100"
+        MinHeight="500" MinWidth="700"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        Background="#F3F3F3"
+        ResizeMode="CanResizeWithGrip">
+
+  <Window.Resources>
+    <Style x:Key="TitleBarButton" TargetType="Button">
+      <Setter Property="Width" Value="46"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="#1C1C1C"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}" CornerRadius="0">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#E5E5E5"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="#CCCCCC"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource TitleBarButton}">
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="#C42B1C"/>
+          <Setter Property="Foreground" Value="White"/>
+        </Trigger>
+        <Trigger Property="IsPressed" Value="True">
+          <Setter Property="Background" Value="#A02316"/>
+          <Setter Property="Foreground" Value="White"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </Window.Resources>
+
+  <Border>
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="32"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <!-- Title bar -->
+      <Grid Grid.Row="0" Background="#F3F3F3" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- App title + loading indicator -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+          <TextBlock Text="Reminders" FontSize="13" FontWeight="SemiBold"
+                     Foreground="#1C1C1C" VerticalAlignment="Center"/>
+          <TextBlock x:Name="LoadingIndicator" Text="  Loading…" FontSize="12"
+                     Foreground="#888888" VerticalAlignment="Center" Visibility="Collapsed"/>
+        </StackPanel>
+
+        <!-- Window controls -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button Style="{StaticResource TitleBarButton}" Click="Minimize_Click">
+            <Path Data="M0,0 H10" Stroke="#1C1C1C" StrokeThickness="1"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Button>
+          <Button Style="{StaticResource TitleBarButton}" Click="Maximize_Click">
+            <Path x:Name="MaximizeIcon"
+                  Data="M0,0 H9 V9 H0 Z" Stroke="#1C1C1C" StrokeThickness="1"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Button>
+          <Button Style="{StaticResource CloseButton}" Click="Close_Click">
+            <Path Data="M0,0 L9,9 M9,0 L0,9" StrokeThickness="1"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Path.Style>
+                <Style TargetType="Path">
+                  <Setter Property="Stroke" Value="#1C1C1C"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                      <Setter Property="Stroke" Value="White"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Path.Style>
+            </Path>
+          </Button>
+        </StackPanel>
+
+        <!-- Resize grip at top for dragging -->
+        <Border Grid.ColumnSpan="2" Grid.Column="0" Height="4" VerticalAlignment="Top"
+                Background="Transparent" Cursor="SizeNS"
+                MouseLeftButtonDown="TopResize_MouseLeftButtonDown"/>
+      </Grid>
+
+      <!-- WebView2 -->
+      <wv2:WebView2 x:Name="WebView"
+                    Grid.Row="1"
+                    NavigationStarting="WebView_NavigationStarting"
+                    NavigationCompleted="WebView_NavigationCompleted"
+                    CoreWebView2InitializationCompleted="WebView_InitializationCompleted"/>
+
+      <!-- Status bar (shown only during navigation) -->
+      <Border Grid.Row="2" Height="22" Background="#EBEBEB"
+              x:Name="StatusBar" Visibility="Collapsed">
+        <TextBlock x:Name="StatusText" Text="" FontSize="11" Foreground="#666666"
+                   VerticalAlignment="Center" Margin="8,0"/>
+      </Border>
+    </Grid>
+  </Border>
+</Window>
