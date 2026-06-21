@@ -60,14 +60,12 @@
         <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
 
-      <!-- Title bar -->
       <Grid Grid.Row="0" Background="#F3F3F3" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-        <!-- App title + loading indicator -->
         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
           <TextBlock Text="Reminders" FontSize="13" FontWeight="SemiBold"
                      Foreground="#1C1C1C" VerticalAlignment="Center"/>
@@ -75,7 +73,6 @@
                      Foreground="#888888" VerticalAlignment="Center" Visibility="Collapsed"/>
         </StackPanel>
 
-        <!-- Window controls -->
         <StackPanel Grid.Column="1" Orientation="Horizontal">
           <Button Style="{StaticResource TitleBarButton}" Click="Minimize_Click">
             <Path Data="M0,0 H10" Stroke="#1C1C1C" StrokeThickness="1"
@@ -103,20 +100,17 @@
           </Button>
         </StackPanel>
 
-        <!-- Resize grip at top for dragging -->
         <Border Grid.ColumnSpan="2" Grid.Column="0" Height="4" VerticalAlignment="Top"
                 Background="Transparent" Cursor="SizeNS"
                 MouseLeftButtonDown="TopResize_MouseLeftButtonDown"/>
       </Grid>
 
-      <!-- WebView2 -->
       <wv2:WebView2 x:Name="WebView"
                     Grid.Row="1"
                     NavigationStarting="WebView_NavigationStarting"
                     NavigationCompleted="WebView_NavigationCompleted"
                     CoreWebView2InitializationCompleted="WebView_InitializationCompleted"/>
 
-      <!-- Status bar (shown only during navigation) -->
       <Border Grid.Row="2" Height="22" Background="#EBEBEB"
               x:Name="StatusBar" Visibility="Collapsed">
         <TextBlock x:Name="StatusText" Text="" FontSize="11" Foreground="#666666"
