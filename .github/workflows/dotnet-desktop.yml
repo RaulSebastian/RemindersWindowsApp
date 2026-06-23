@@ -25,13 +25,13 @@ jobs:
         dotnet-version: 10.x
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore src/RemindersApp/RemindersApp.csproj
 
     - name: Build
-      run: dotnet build --no-restore --configuration ${{ matrix.configuration }}
+      run: dotnet build src/RemindersApp/RemindersApp.csproj --no-restore --configuration ${{ matrix.configuration }}
 
     - name: Run tests
-      run: dotnet test --no-build --configuration ${{ matrix.configuration }} --verbosity normal
+      run: dotnet test tests/RemindersApp.Tests/RemindersApp.Tests.csproj --configuration ${{ matrix.configuration }} --verbosity normal
 
     - name: Upload build artifacts
       if: matrix.configuration == 'Release' && success()
