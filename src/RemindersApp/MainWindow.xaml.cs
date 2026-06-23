@@ -10,12 +10,19 @@ namespace RemindersApp;
 public partial class MainWindow : Window
 {
     private const string RemindersUrl = "https://www.icloud.com/reminders/";
+    private string? webViewUserDataFolder;
 
 
     public MainWindow()
     {
         InitializeComponent();
         StateChanged += MainWindow_StateChanged;
+        Closed += MainWindow_Closed;
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        CleanupWebViewUserData();
     }
     
     [SuppressMessage("ReSharper", "AsyncVoidEventHandlerMethod", Justification = "WPF virtual override")]
@@ -36,12 +43,28 @@ public partial class MainWindow : Window
 
     private async Task InitializeWebView()
     {
-        var userDataFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "RemindersApp", "WebView2");
+        webViewUserDataFolder = Path.Combine(Path.GetTempPath(), $"RemindersApp_{Guid.NewGuid()}");
+        Directory.CreateDirectory(webViewUserDataFolder);
 
-        var webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
+        var webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, webViewUserDataFolder);
         await WebView.EnsureCoreWebView2Async(webViewEnvironment);
+    }
+
+    private void CleanupWebViewUserData()
+    {
+        if (string.IsNullOrEmpty(webViewUserDataFolder) || !Directory.Exists(webViewUserDataFolder))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.Delete(webViewUserDataFolder, recursive: true);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void WebView_InitializationCompleted(object sender,
@@ -73,8 +96,8 @@ public partial class MainWindow : Window
         settings.IsStatusBarEnabled = false;
         settings.IsZoomControlEnabled = false;
         settings.AreHostObjectsAllowed = false;
-        settings.IsGeneralAutofillEnabled = true;
-        settings.IsPasswordAutosaveEnabled = true;
+        settings.IsGeneralAutofillEnabled = false;
+        settings.IsPasswordAutosaveEnabled = false;
     }
 
     private void SubscribeToWebViewEvents(CoreWebView2 coreWebView2)
@@ -292,9 +315,6 @@ public partial class MainWindow : Window
 
     private static class NativeMethods
     {
-        [DllImport("user32.dll")]
-        public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
-
         [DllImport("user32.dll")]
         public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
