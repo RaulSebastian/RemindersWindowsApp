@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Interop;
 using Microsoft.Web.WebView2.Core;
 
@@ -19,30 +18,30 @@ public partial class MainWindow : Window
         StateChanged += MainWindow_StateChanged;
     }
     
-    [SuppressMessage("ReSharper", "AsyncVoidEventHandlerMethod", Justification = "we cant do anything about this WPF override")]
+    [SuppressMessage("ReSharper", "AsyncVoidEventHandlerMethod", Justification = "WPF virtual override")]
     protected override async void OnContentRendered(EventArgs e)
     {
         base.OnContentRendered(e);
 
         try
         {
-            await InitWebView();
+            await InitializeWebView();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show($"Failed to initialize:{Environment.NewLine}{ex.Message}",
+            MessageBox.Show($"Failed to initialize:{Environment.NewLine}{exception.Message}",
                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private async Task InitWebView()
+    private async Task InitializeWebView()
     {
         var userDataFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RemindersApp", "WebView2");
 
-        var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
-        await WebView.EnsureCoreWebView2Async(env);
+        var webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
+        await WebView.EnsureCoreWebView2Async(webViewEnvironment);
     }
 
     private void WebView_InitializationCompleted(object sender,
@@ -55,31 +54,44 @@ public partial class MainWindow : Window
             return;
         }
 
-        var core = WebView.CoreWebView2;
-        ConfigureWebView(core);
-        core.Navigate(RemindersUrl);
+        var coreWebView2 = WebView.CoreWebView2;
+        ConfigureWebView(coreWebView2);
+        coreWebView2.Navigate(RemindersUrl);
     }
 
-    private void ConfigureWebView(CoreWebView2 core)
+    private void ConfigureWebView(CoreWebView2 coreWebView2)
     {
-        core.Settings.AreDefaultContextMenusEnabled = false;
-        core.Settings.AreDevToolsEnabled = false;
-        core.Settings.IsStatusBarEnabled = false;
-        core.Settings.IsZoomControlEnabled = false;
-        core.Settings.AreHostObjectsAllowed = false;
-        core.Settings.IsGeneralAutofillEnabled = true;
-        core.Settings.IsPasswordAutosaveEnabled = true;
-
-        core.NewWindowRequested += Core_NewWindowRequested;
-        core.SourceChanged += Core_SourceChanged;
-        core.DocumentTitleChanged += (_, _) =>
-            Dispatcher.Invoke(() => Title = core.DocumentTitle is { Length: > 0 } t ? t : "Reminders");
-
-        core.AddScriptToExecuteOnDocumentCreatedAsync(HideOffAppLinksScript);
-        core.AddScriptToExecuteOnDocumentCreatedAsync(HidePageChromeScript);
+        ConfigureWebViewSettings(coreWebView2.Settings);
+        SubscribeToWebViewEvents(coreWebView2);
+        InjectWebViewScripts(coreWebView2);
     }
 
-    private const string HidePageChromeScript = """
+    private void ConfigureWebViewSettings(CoreWebView2Settings settings)
+    {
+        settings.AreDefaultContextMenusEnabled = false;
+        settings.AreDevToolsEnabled = false;
+        settings.IsStatusBarEnabled = false;
+        settings.IsZoomControlEnabled = false;
+        settings.AreHostObjectsAllowed = false;
+        settings.IsGeneralAutofillEnabled = true;
+        settings.IsPasswordAutosaveEnabled = true;
+    }
+
+    private void SubscribeToWebViewEvents(CoreWebView2 coreWebView2)
+    {
+        coreWebView2.NewWindowRequested += HandleNewWindowRequested;
+        coreWebView2.SourceChanged += HandleSourceChanged;
+        coreWebView2.DocumentTitleChanged += (_, _) =>
+            Dispatcher.Invoke(() => Title = coreWebView2.DocumentTitle is { Length: > 0 } title ? title : "Reminders");
+    }
+
+    private void InjectWebViewScripts(CoreWebView2 coreWebView2)
+    {
+        coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(HideExternalAppLinksScript);
+        coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(HideHeaderChromeScript);
+    }
+
+    private const string HideHeaderChromeScript = """
         (function () {
             const css = 'header { display: none !important; }';
             const style = document.createElement('style');
@@ -88,7 +100,7 @@ public partial class MainWindow : Window
         })();
         """;
 
-    private const string HideOffAppLinksScript = """
+    private const string HideExternalAppLinksScript = """
         (function () {
             const authHosts = ['idmsa.apple.com', 'appleid.apple.com', 'gsa.apple.com', 'icloud.com.cn'];
 
@@ -121,22 +133,18 @@ public partial class MainWindow : Window
         })();
         """;
 
-    // SourceChanged fires for SPA pushState/replaceState navigation that NavigationStarting misses
-    private void Core_SourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
+    private void HandleSourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
     {
-        var url = WebView.CoreWebView2.Source;
+        var sourceUrl = WebView.CoreWebView2.Source;
 
         Dispatcher.Invoke(() =>
         {
-#if DEBUG
-            DebugUrlIndicator.Text = url;
-#endif
-            if (!NavigationGuard.IsAllowedUrl(url))
+            if (!NavigationGuard.IsAllowedUrl(sourceUrl))
                 WebView.CoreWebView2.Navigate(RemindersUrl);
         });
     }
 
-    private void Core_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    private void HandleNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
         e.Handled = true;
         if (NavigationGuard.IsAllowedUrl(e.Uri))
@@ -156,62 +164,51 @@ public partial class MainWindow : Window
             LoadingIndicator.Visibility = Visibility.Visible;
             StatusBar.Visibility = Visibility.Visible;
             StatusText.Text = $"Loading {new Uri(e.Uri).Host}…";
-#if DEBUG
-            DebugUrlIndicator.Visibility = Visibility.Visible;
-            DebugUrlIndicator.Text = e.Uri;
-#endif
         });
     }
 
     private async void WebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
     {
+        HideLoadingIndicators();
+        await ReapplyWebViewScripts();
+    }
+
+    private void HideLoadingIndicators()
+    {
         Dispatcher.Invoke(() =>
         {
             LoadingIndicator.Visibility = Visibility.Collapsed;
             StatusBar.Visibility = Visibility.Collapsed;
-#if DEBUG
-            DebugUrlIndicator.Text = WebView.Source?.ToString() ?? string.Empty;
-#endif
         });
-
-        // Re-run after the SPA has rendered — AddScriptToExecuteOnDocumentCreatedAsync fires too
-        // early for iCloud's React app; MutationObserver handles subsequent dynamic updates.
-        await WebView.CoreWebView2.ExecuteScriptAsync(HideOffAppLinksScript);
-        await WebView.CoreWebView2.ExecuteScriptAsync(HidePageChromeScript);
     }
 
-
-    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private async Task ReapplyWebViewScripts()
     {
-        if (e.ClickCount == 2)
-        {
-            ToggleMaximize();
-            return;
-        }
-        DragMove();
+        await WebView.CoreWebView2.ExecuteScriptAsync(HideExternalAppLinksScript);
+        await WebView.CoreWebView2.ExecuteScriptAsync(HideHeaderChromeScript);
     }
+
+
 
     private void Minimize_Click(object sender, RoutedEventArgs e) =>
         WindowState = WindowState.Minimized;
 
     private void Maximize_Click(object sender, RoutedEventArgs e) =>
-        ToggleMaximize();
+        ToggleWindowMaximization();
 
     private void Close_Click(object sender, RoutedEventArgs e) =>
         Close();
 
-    private void ToggleMaximize() =>
+    private void ToggleWindowMaximization() =>
         WindowState = WindowState == WindowState.Maximized
             ? WindowState.Normal
             : WindowState.Maximized;
 
-    private void MainWindow_StateChanged(object? sender, EventArgs e)
-    {
+    private void MainWindow_StateChanged(object? sender, EventArgs e) =>
         MaximizeIcon.Data = System.Windows.Media.Geometry.Parse(
             WindowState == WindowState.Maximized
                 ? "M2,0 H9 V7 M0,2 H7 V9 H0 Z"
                 : "M0,0 H9 V9 H0 Z");
-    }
 
     // WindowStyle=None requires manual WM_GETMINMAXINFO handling to avoid covering the taskbar
     protected override void OnSourceInitialized(EventArgs e)
@@ -221,37 +218,39 @@ public partial class MainWindow : Window
         source?.AddHook(WndProc);
     }
 
-    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    private IntPtr WndProc(IntPtr windowHandle, int messageType, IntPtr wordParam, IntPtr longParam, ref bool messageHandled)
     {
-        const int WM_GETMINMAXINFO = 0x0024;
-        if (msg == WM_GETMINMAXINFO)
+        const int GetMinMaxInfoMessage = 0x0024;
+        if (messageType == GetMinMaxInfoMessage)
         {
-            var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
-            var monitor = NativeMethods.MonitorFromWindow(hwnd, 0x00000002);
-            if (monitor != IntPtr.Zero)
-            {
-                var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-                NativeMethods.GetMonitorInfo(monitor, ref info);
-                mmi.ptMaxPosition = new POINT(
-                    info.rcWork.Left - info.rcMonitor.Left,
-                    info.rcWork.Top - info.rcMonitor.Top);
-                mmi.ptMaxSize = new POINT(
-                    info.rcWork.Right - info.rcWork.Left,
-                    info.rcWork.Bottom - info.rcWork.Top);
-                mmi.ptMaxTrackSize = mmi.ptMaxSize;
-            }
-            Marshal.StructureToPtr(mmi, lParam, true);
-            handled = true;
+            var minMaxInfo = Marshal.PtrToStructure<MINMAXINFO>(longParam);
+            ApplyMonitorConstraints(windowHandle, ref minMaxInfo);
+            Marshal.StructureToPtr(minMaxInfo, longParam, true);
+            messageHandled = true;
         }
         return IntPtr.Zero;
     }
 
-    // WindowStyle=None means WPF won't handle top-edge resize; SC_SIZE sends it to the OS
-    private void TopResize_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void ApplyMonitorConstraints(IntPtr windowHandle, ref MINMAXINFO minMaxInfo)
     {
-        var handle = new WindowInteropHelper(this).Handle;
-        NativeMethods.SendMessage(handle, 0x0112, (IntPtr)0xF003, IntPtr.Zero);
+        var monitorHandle = NativeMethods.MonitorFromWindow(windowHandle, 0x00000002);
+        if (monitorHandle == IntPtr.Zero)
+            return;
+
+        var monitorInfo = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        NativeMethods.GetMonitorInfo(monitorHandle, ref monitorInfo);
+
+        minMaxInfo.ptMaxPosition = new POINT(
+            monitorInfo.rcWork.Left - monitorInfo.rcMonitor.Left,
+            monitorInfo.rcWork.Top - monitorInfo.rcMonitor.Top);
+
+        minMaxInfo.ptMaxSize = new POINT(
+            monitorInfo.rcWork.Right - monitorInfo.rcWork.Left,
+            monitorInfo.rcWork.Bottom - monitorInfo.rcWork.Top);
+
+        minMaxInfo.ptMaxTrackSize = minMaxInfo.ptMaxSize;
     }
+
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT(int x, int y)

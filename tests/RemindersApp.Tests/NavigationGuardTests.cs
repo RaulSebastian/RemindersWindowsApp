@@ -1,4 +1,3 @@
-using RemindersApp;
 using Xunit;
 
 namespace RemindersApp.Tests;
