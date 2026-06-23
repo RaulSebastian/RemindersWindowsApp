@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -16,10 +17,25 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         StateChanged += MainWindow_StateChanged;
-        InitWebView();
+    }
+    
+    [SuppressMessage("ReSharper", "AsyncVoidEventHandlerMethod", Justification = "we cant do anything about this WPF override")]
+    protected override async void OnContentRendered(EventArgs e)
+    {
+        base.OnContentRendered(e);
+
+        try
+        {
+            await InitWebView();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to initialize:{Environment.NewLine}{ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
-    private async void InitWebView()
+    private async Task InitWebView()
     {
         var userDataFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -55,15 +71,23 @@ public partial class MainWindow : Window
         core.Settings.IsPasswordAutosaveEnabled = true;
 
         core.NewWindowRequested += Core_NewWindowRequested;
+        core.SourceChanged += Core_SourceChanged;
         core.DocumentTitleChanged += (_, _) =>
             Dispatcher.Invoke(() => Title = core.DocumentTitle is { Length: > 0 } t ? t : "Reminders");
 
         core.AddScriptToExecuteOnDocumentCreatedAsync(HideOffAppLinksScript);
+        core.AddScriptToExecuteOnDocumentCreatedAsync(HidePageChromeScript);
     }
 
-    // Hides links and buttons that navigate away from the reminders section.
-    // "Learn more", the iCloud logo, and the app-switcher (···) all point to allowed hosts
-    // but take the user out of the reminders app — so we keep only reminders paths + auth hosts.
+    private const string HidePageChromeScript = """
+        (function () {
+            const css = 'header { display: none !important; }';
+            const style = document.createElement('style');
+            style.textContent = css;
+            document.addEventListener('DOMContentLoaded', () => document.head.appendChild(style));
+        })();
+        """;
+
     private const string HideOffAppLinksScript = """
         (function () {
             const authHosts = ['idmsa.apple.com', 'appleid.apple.com', 'gsa.apple.com', 'icloud.com.cn'];
@@ -96,6 +120,21 @@ public partial class MainWindow : Window
             }).observe(document.documentElement, { childList: true, subtree: true });
         })();
         """;
+
+    // SourceChanged fires for SPA pushState/replaceState navigation that NavigationStarting misses
+    private void Core_SourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
+    {
+        var url = WebView.CoreWebView2.Source;
+
+        Dispatcher.Invoke(() =>
+        {
+#if DEBUG
+            DebugUrlIndicator.Text = url;
+#endif
+            if (!NavigationGuard.IsAllowedUrl(url))
+                WebView.CoreWebView2.Navigate(RemindersUrl);
+        });
+    }
 
     private void Core_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
@@ -138,6 +177,7 @@ public partial class MainWindow : Window
         // Re-run after the SPA has rendered — AddScriptToExecuteOnDocumentCreatedAsync fires too
         // early for iCloud's React app; MutationObserver handles subsequent dynamic updates.
         await WebView.CoreWebView2.ExecuteScriptAsync(HideOffAppLinksScript);
+        await WebView.CoreWebView2.ExecuteScriptAsync(HidePageChromeScript);
     }
 
 
