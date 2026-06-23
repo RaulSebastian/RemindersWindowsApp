@@ -249,6 +249,18 @@ public partial class MainWindow : Window
             monitorInfo.rcWork.Bottom - monitorInfo.rcWork.Top);
 
         minMaxInfo.ptMaxTrackSize = minMaxInfo.ptMaxSize;
+
+        // Respect WPF MinWidth and MinHeight
+        var source = HwndSource.FromHwnd(windowHandle);
+        if (source?.CompositionTarget == null)
+        {
+            return;
+        }
+
+        var matrix = source.CompositionTarget.TransformToDevice;
+        minMaxInfo.ptMinTrackSize = new POINT(
+            (int)(MinWidth * matrix.M11),
+            (int)(MinHeight * matrix.M22));
     }
 
 

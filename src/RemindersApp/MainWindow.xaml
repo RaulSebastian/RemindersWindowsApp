@@ -4,7 +4,7 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Reminders"
         Height="800" Width="1100"
-        MinHeight="500" MinWidth="300"
+        MinHeight="500" MinWidth="500"
         WindowStyle="None"
         AllowsTransparency="False"
         Background="#F3F3F3"
@@ -12,9 +12,9 @@
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40"
-                      GlassFrameThickness="0"
+                      GlassFrameThickness="1"
                       CornerRadius="0"
-                      ResizeBorderThickness="6" />
+                      ResizeBorderThickness="10" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -60,7 +60,7 @@
     </Style>
   </Window.Resources>
 
-  <Border>
+  <Border BorderBrush="#CCCCCC" BorderThickness="1">
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="40"/>
