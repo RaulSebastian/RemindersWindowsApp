@@ -1,0 +1,42 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore --configuration ${{ matrix.configuration }}
+
+    - name: Run tests
+      run: dotnet test --no-build --configuration ${{ matrix.configuration }} --verbosity normal
+
+    - name: Upload build artifacts
+      if: matrix.configuration == 'Release' && success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: RemindersApp-Release
+        path: src/RemindersApp/bin/Release/net10.0-windows/RemindersApp.exe
+        retention-days: 30
