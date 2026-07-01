@@ -7,11 +7,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>RemindersApp</AssemblyName>
-<RootNamespace>RemindersApp</RootNamespace>
+    <RootNamespace>RemindersApp</RootNamespace>
+    <ApplicationIcon>Assets\reminders.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
+    <PackageReference Include="JetBrains.Annotations" Version="2026.2.*" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" />
   </ItemGroup>
 
   <ItemGroup>

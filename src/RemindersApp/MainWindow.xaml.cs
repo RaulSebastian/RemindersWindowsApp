@@ -3,15 +3,16 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using JetBrains.Annotations;
 using Microsoft.Web.WebView2.Core;
 
 namespace RemindersApp;
 
-public partial class MainWindow : Window
+[UsedImplicitly]
+public partial class MainWindow
 {
     private const string RemindersUrl = "https://www.icloud.com/reminders/";
     private string? webViewUserDataFolder;
-
 
     public MainWindow()
     {
